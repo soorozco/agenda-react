@@ -13,7 +13,10 @@ export type Contacto = {
   telefono: string;
   email?: string;
   notas?: string;
-  creadoEn: string; // ISO
+  domicilio?: string;
+  colonia?: string;
+  estado?: string;        // ← nuevo
+  creadoEn: string;       // ISO
 };
 
 const LS_KEY = "agenda_telefonica_contactos_v1";
@@ -31,7 +34,7 @@ function useLocalStorage<T>(key: string, valorInicial: T) {
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify(valor));
-    } catch {}
+    } catch { }
   }, [key, valor]);
   return [valor, setValor] as const;
 }
@@ -70,6 +73,9 @@ async function apiList(q: string) {
     telefono: String(x.telefono),
     email: x.email ?? undefined,
     notas: x.notas ?? undefined,
+    domicilio: x.domicilio ?? undefined,
+    colonia: x.colonia ?? undefined,
+    estado: x.estado ?? undefined,
     creadoEn: esFechaValidaISO(x.creado_en) ? String(x.creado_en) : new Date().toISOString(),
   }));
   return mapped;
@@ -83,6 +89,9 @@ async function apiCreate(body: Partial<Contacto>) {
       telefono: body.telefono,
       email: body.email ?? null,
       notas: body.notas ?? null,
+      domicilio: body.domicilio ?? null,
+      colonia: body.colonia ?? null,
+      estado: body.estado ?? null,
     }),
   });
   if (!r.ok) throw new Error("Error createContact");
@@ -97,6 +106,9 @@ async function apiUpdate(id: string, body: Partial<Contacto>) {
       telefono: body.telefono,
       email: body.email ?? null,
       notas: body.notas ?? null,
+      domicilio: body.domicilio ?? null,
+      colonia: body.colonia ?? null,
+      estado: body.estado ?? null,
     }),
   });
   if (!r.ok) throw new Error("Error updateContact");
@@ -135,11 +147,14 @@ export default function AgendaTelefonica() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Formulario controlado
-  const [form, setForm] = useState<{ nombre: string; telefono: string; email: string; notas: string }>({
+  const [form, setForm] = useState<{ nombre: string; telefono: string; email: string; notas: string; domicilio: string; colonia: string; estado: string; }>({
     nombre: "",
     telefono: "",
     email: "",
     notas: "",
+    domicilio: "",
+    colonia: "",
+    estado: "",
   });
 
   // 🔎 Búsqueda
@@ -199,7 +214,10 @@ export default function AgendaTelefonica() {
     return sorted;
   }, [contactos, busqueda, orden]);
 
-  const resetForm = () => setForm({ nombre: "", telefono: "", email: "", notas: "" });
+  const resetForm = () => setForm({
+    nombre: "", telefono: "", email: "", notas: "",
+    domicilio: "", colonia: "", estado: ""
+  });
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,40 +263,43 @@ export default function AgendaTelefonica() {
 
     // Modo LOCAL
     if (editandoId) {
-      setContactosLocal((prev) =>
-        prev.map((c) =>
-          c.id === editandoId
-            ? {
-                ...c,
-                nombre,
-                telefono: normalizarTelefono(telefono),
-                email: email || undefined,
-                notas: notas || undefined,
-                creadoEn: esFechaValidaISO(c.creadoEn) ? c.creadoEn : new Date().toISOString(),
-              }
-            : c
-        )
-      );
-      setEditandoId(null);
-      resetForm();
+      setContactosLocal(prev => prev.map(c =>
+        c.id === editandoId ? {
+          ...c, nombre, telefono: normalizarTelefono(telefono),
+          email: email || undefined, notas: notas || undefined,
+          domicilio: form.domicilio || undefined,
+          colonia: form.colonia || undefined,
+          estado: form.estado || undefined,
+          creadoEn: esFechaValidaISO(c.creadoEn) ? c.creadoEn : new Date().toISOString(),
+        } : c
+      ));
     } else {
-      const ahoraISO = new Date().toISOString();
       const nuevo: Contacto = {
         id: crypto.randomUUID(),
         nombre,
         telefono: normalizarTelefono(telefono),
         email: email || undefined,
         notas: notas || undefined,
-        creadoEn: ahoraISO,
+        domicilio: form.domicilio || undefined,
+        colonia: form.colonia || undefined,
+        estado: form.estado || undefined,
+        creadoEn: new Date().toISOString(),
       };
-      setContactosLocal((prev) => [nuevo, ...prev]);
-      resetForm();
+      setContactosLocal(prev => [nuevo, ...prev]);
     }
   };
 
   const onEditar = (c: Contacto) => {
     setEditandoId(c.id);
-    setForm({ nombre: c.nombre, telefono: c.telefono, email: c.email || "", notas: c.notas || "" });
+    setForm({
+      nombre: c.nombre,
+      telefono: c.telefono,
+      email: c.email || "",
+      notas: c.notas || "",
+      domicilio: c.domicilio || "",
+      colonia: c.colonia || "",
+      estado: c.estado || "",
+    });
   };
 
   const onCancelarEdicion = () => {
@@ -536,24 +557,104 @@ export default function AgendaTelefonica() {
           <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
             <div className="grid gap-1">
               <label className="text-sm font-medium">Nombre *</label>
-              <input className="px-3 py-2 rounded-xl border focus:outline-none focus:ring" value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} placeholder="Ej. María Pérez" required />
+              <input
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring"
+                value={form.nombre}
+                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+                placeholder="Ej. María Pérez"
+                required
+              />
             </div>
+
             <div className="grid gap-1">
               <label className="text-sm font-medium">Teléfono *</label>
-              <input className="px-3 py-2 rounded-xl border focus:outline-none focus:ring" value={form.telefono} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} placeholder="Ej. +52 33 1234 5678" required />
+              <input
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring"
+                value={form.telefono}
+                onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
+                placeholder="Ej. +52 33 1234 5678"
+                required
+              />
             </div>
+
             <div className="grid gap-1">
               <label className="text-sm font-medium">Email</label>
-              <input type="email" className="px-3 py-2 rounded-xl border focus:outline-none focus:ring" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Ej. nombre@correo.com" />
+              <input
+                type="email"
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="Ej. nombre@correo.com"
+              />
             </div>
+
+            <div className="grid gap-1">
+              <label className="text-sm font-medium">Domicilio</label>
+              <input
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring"
+                value={form.domicilio}
+                onChange={(e) => setForm((f) => ({ ...f, domicilio: e.target.value }))}
+                placeholder="Calle, número"
+              />
+            </div>
+
+            <div className="grid gap-1">
+              <label className="text-sm font-medium">Colonia</label>
+              <input
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring"
+                value={form.colonia}
+                onChange={(e) => setForm((f) => ({ ...f, colonia: e.target.value }))}
+                placeholder="Ej. Colonia Americana"
+              />
+            </div>
+
+            <div className="grid gap-1">
+              <label className="text-sm font-medium">Estado</label>
+              <select
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring"
+                value={form.estado}
+                onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}
+              >
+                <option value="">— Selecciona un estado —</option>
+                {[
+                  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas",
+                  "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México",
+                  "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit",
+                  "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí",
+                  "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas"
+                ].map((est) => (
+                  <option key={est} value={est}>
+                    {est}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid gap-1 md:col-span-2">
               <label className="text-sm font-medium">Notas</label>
-              <textarea className="px-3 py-2 rounded-xl border focus:outline-none focus:ring min-h-[72px]" value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} placeholder="Datos adicionales, extensión, cumple, relación, etc." />
+              <textarea
+                className="px-3 py-2 rounded-xl border focus:outline-none focus:ring min-h-[72px]"
+                value={form.notas}
+                onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
+                placeholder="Datos adicionales, extensión, cumple, relación, etc."
+              />
             </div>
+
             <div className="md:col-span-2 flex gap-2">
-              <button type="submit" className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">{editandoId ? "Guardar cambios" : "Agregar"}</button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+              >
+                {editandoId ? "Guardar cambios" : "Agregar"}
+              </button>
               {editandoId && (
-                <button type="button" className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300" onClick={onCancelarEdicion}>Cancelar</button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300"
+                  onClick={onCancelarEdicion}
+                >
+                  Cancelar
+                </button>
               )}
             </div>
           </form>
@@ -623,6 +724,5 @@ export default function AgendaTelefonica() {
     </div>
   );
 }
-
 
 
